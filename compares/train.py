@@ -310,27 +310,6 @@ def run_experiment(
             f.write('\t'.join(header_types) + '\n')
             inter_df.to_csv(f, sep='\t', index=False, header=False)
 
-
-         # Обновляем конфигурацию
-        config_dict = {
-            'data_path': output_dir,
-            'checkpoint_dir': f'./ckpts/saved_{experiment_name}',
-            'save_dataset': True,
-            'load_col': {
-                'inter': ['user_id', 'item_id', 'rating', 'timestamp']  # Явно указываем все необходимые поля
-            },
-           'eval_args': {
-                'split': {'RS': [0.8, 0.1, 0.1]},
-                'order': 'TO',
-                'group_by': 'user',
-                'mode': 'full'
-            },
-            'MAX_ITEM_LIST_LENGTH': 50,
-            'ITEM_LIST_LENGTH_FIELD': 'item_length',
-            'LIST_SUFFIX': '_list',
-            'max_seq_length': 50
-        }
-
         # Получаем класс модели
         model_class = MODEL_MAPPING.get(model_params['model'])
         if model_class is None:
@@ -379,7 +358,7 @@ def run_experiment(
 
         # Запускаем кастомные метрики
         category_info = {}  # Подгрузите реальные категории
-        custom_metrics = evaluate_with_custom_metrics(preprocessor, config_dict, df_videos_map)
+        custom_metrics = evaluate_with_custom_metrics(preprocessor, config, df_videos_map)
         logger.info(f"Custom Metrics: {custom_metrics}")
 
         return {

@@ -6,9 +6,15 @@ data:
   ITEM_ID_FIELD: item_id
   TIME_FIELD: timestamp
   RATING_FIELD: rating
-  load_col:
-    inter: [user_id, item_id, rating, timestamp]
-  
+
+MAX_ITEM_LIST_LENGTH: 50
+ITEM_LIST_LENGTH_FIELD: 'item_length'
+LIST_SUFFIX: '_list'
+max_seq_length: 50
+
+load_col:
+  inter: [user_id, item_id, rating, timestamp]
+
   # Добавляем секцию для работы с признаками
   feature_config:
     use_numerical: true

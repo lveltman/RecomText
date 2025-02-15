@@ -1,4 +1,5 @@
 model: BERT4Rec
+n_heads: 8
 hidden_size: 512
 inner_size: 2048
 num_hidden_layers: 4
