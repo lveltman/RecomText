@@ -357,14 +357,13 @@ def run_experiment(
         logger.info('Test result: {}'.format(test_result))
 
         # Запускаем кастомные метрики
-        category_info = {}  # Подгрузите реальные категории
-        custom_metrics = evaluate_with_custom_metrics(preprocessor, config, df_videos_map)
-        logger.info(f"Custom Metrics: {custom_metrics}")
+        # custom_metrics = evaluate_with_custom_metrics(preprocessor, config, df_videos_map)
+        # logger.info(f"Custom Metrics: {custom_metrics}")
 
         return {
             'best_valid_result': best_valid_result,
             'test_result': test_result,
-            'custom_metrics': custom_metrics
+            # 'custom_metrics': custom_metrics
         }
 
     except Exception as e:
