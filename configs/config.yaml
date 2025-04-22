@@ -5,10 +5,10 @@ model:
 
 data:
   max_length: 128
-  batch_size: 128
+  batch_size: 256
 
 training:
-  epochs: 5
+  epochs: 2
   learning_rate: 3e-5
   lambda_rec: 0.5
   weight_decay: 0.01

@@ -235,10 +235,6 @@ class Trainer:
                         item_embeddings_array,
                         metrics_calculator,
                         category_mapping,
-                        top_k
-                        # demographic_data,
-                        # demographic_features,
-                        # demographic_centroids
                         top_k,
                         demographic_data,
                         demographic_features,
@@ -253,7 +249,6 @@ class Trainer:
         
         return self._compile_metrics(total_loss, total_contrastive_loss, total_recommendation_loss, metrics_accum, num_users)
 
-    def _process_user(self, user_emb, item_emb, items_ids, user_id, index, video_ids, df_videos_map, item_embeddings_array, metrics_calculator, category_mapping, top_k):
     def _process_user(self, user_emb, target_emb, items_ids, user_id, index, video_ids, df_videos_map, item_embeddings, metrics_calculator, top_k, demographic_data, demographic_features, demographic_centroids):
         """Обработка одного пользователя для расчета метрик"""
         # Поиск рекомендаций
@@ -345,12 +340,7 @@ class Trainer:
             recommended_ids,
             relevant_ids,
             relevance_scores,
-            k=top_k
-            # user_demographics,
-            # demographic_centroids
-            top_k,
-            user_demographics,
-            demographic_centroids
+            top_k
         )
 
 

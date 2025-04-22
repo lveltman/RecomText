@@ -194,7 +194,7 @@ def create_repo_info_table(df: pd.DataFrame) -> pd.DataFrame:
     repo_info = df[['nameWithOwner', 'description', 'primaryLanguage', 'languages', 'topics']].copy()
     
     # Создаем маппинг ID репозиториев в числовые индексы
-    repo_info['repo_id'] = repo_info['nameWithOwner'].apply(lambda x: x.replace('/', '_'))
+    df['repo_id'] = df['nameWithOwner'].apply(create_hash)
     item_id_map = {repo_id: idx for idx, repo_id in enumerate(repo_info['repo_id'].unique())}
     
     # Добавляем числовой ID языка
