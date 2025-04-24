@@ -1,5 +1,5 @@
 model:
-  text_model_name: "intfloat/multilingual-e5-base"
+  text_model_name: "/home/veltman.lina/RecomText/checkpoints/model_epoch_0" #"intfloat/multilingual-e5-base"
   id_embed_dim: 256
   text_embed_dim: 768
 

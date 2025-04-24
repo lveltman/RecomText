@@ -52,16 +52,25 @@ class Trainer:
         """Полный цикл обучения с валидацией."""
         for epoch in range(epochs):
             print(f"\nEpoch {epoch + 1}/{epochs}")
+
+            if epoch > 0:
+                # Только начиная со 2-й эпохи (epoch == 1) тренируем
+                train_metrics = self.train_epoch()
+                print("\nTraining metrics:")
+                self._print_metrics(train_metrics)
+            else:
+                print("\nSkipping training on first epoch (warm start).")
             
-            # Обучение
-            train_metrics = self.train_epoch()
-            if epoch == 0:
-                self._save_checkpoint(epoch)
-            print("\nTraining metrics:")
-            self._print_metrics(train_metrics)
+            # # Обучение
+            # if epoch == 0:
+            #     self._save_checkpoint(epoch)
+            # print("\nTraining metrics:")
+            # self._print_metrics(train_metrics)
             
             # Валидация
+            print("Validation")
             val_metrics = self.validate()
+            print("Validation end")
             if val_metrics:  # Проверяем, что метрики не None
                 # Проверка на улучшение
                 current_metric = val_metrics.get('contextual_ndcg', 0)  # Используем contextual_ndcg
@@ -106,8 +115,15 @@ class Trainer:
         total_recommendation_loss = 0
         
         # Загрузка необходимых данных
+        # textual_history = pd.read_parquet('./data/textual_history.parquet')
         textual_history = pd.read_parquet('./data/textual_history.parquet')
         df_videos = pd.read_parquet("./data/video_info.parquet")
+        df_videos = (
+            df_videos
+            .groupby('clean_video_id')['category']
+            .agg(lambda x: list(set(x)))  # убрать дубли
+            .reset_index()
+        )
         df_videos_map = df_videos.set_index('clean_video_id').to_dict(orient='index')
 
         try:
@@ -117,7 +133,7 @@ class Trainer:
         except Exception as e:
             print(f"Warning: Could not load category mapping: {str(e)}")
             category_mapping = {}
-
+        print("INDEX START")
         try:
            from indexer import main as update_index
            index_config = self.config.copy()
@@ -131,7 +147,7 @@ class Trainer:
         except Exception as e:
            print(f"Error updating index: {str(e)}")
            return None
-
+        print("INDEX END")
         # Проверка и обновление индекса
         index_path = self.config['inference']['index_path']
         ids_path = self.config['inference']['ids_path']
@@ -188,12 +204,15 @@ class Trainer:
         except Exception as e:
             print(f"Warning: Could not load demographic data: {str(e)}")
             demographic_centroids = None
+            demographic_data = None
+            demographic_features = None
         
         # Инициализация метрик
         sim_threshold_precision = self.config['metrics'].get('sim_threshold_precision', 0.07)
         sim_threshold_ndcg = self.config['metrics'].get('sim_threshold_ndcg', 0.8)
+        calibration_samples = self.config['metrics'].get('calibration_samples', 1000)
         metrics_calculator = MetricsCalculator(sim_threshold_precision=sim_threshold_precision,
-                                               sim_threshold_ndcg=sim_threshold_ndcg)
+                                               sim_threshold_ndcg=sim_threshold_ndcg, calibration_samples=calibration_samples)
         metrics_accum = {metric: 0.0 for metric in ["semantic_precision@k", "cross_category_relevance", "contextual_ndcg", "precision@k", "recall@k", "ndcg@k", "mrr@k"]}
         top_k = self.config['inference'].get('top_k', 10)
             
@@ -249,7 +268,7 @@ class Trainer:
         
         return self._compile_metrics(total_loss, total_contrastive_loss, total_recommendation_loss, metrics_accum, num_users)
 
-    def _process_user(self, user_emb, target_emb, items_ids, user_id, index, video_ids, df_videos_map, item_embeddings, metrics_calculator, top_k, demographic_data, demographic_features, demographic_centroids):
+    def _process_user(self, user_emb, target_emb, items_ids, user_id, index, video_ids, df_videos_map, item_embeddings, metrics_calculator, category_mapping, top_k, demographic_data, demographic_features, demographic_centroids):
         """Обработка одного пользователя для расчета метрик"""
         # Поиск рекомендаций
         user_emb_np = user_emb.cpu().numpy().astype('float32')
@@ -275,14 +294,17 @@ class Trainer:
                 
                 # Добавляем relevance score (по умолчанию 1.0)
                 relevance_scores[str(faiss_video_id)] = 1.0
-                
+
                 if orig_video_id in df_videos_map:
-                    category_name = df_videos_map[orig_video_id].get('category', 'Unknown')
-                    # Получаем числовой ID категории из маппинга
+                    categories = df_videos_map[orig_video_id].get('category', [])
+                    if isinstance(categories, list) and len(categories) > 0:
+                        category_name = categories[0]  # берем первую
+                    else:
+                        category_name = 'Unknown'
                     category_id = category_mapping.get(category_name, -1)
                     rec_categories.append(category_id)
                 else:
-                    rec_categories.append(-1)  # -1 для неизвестной категории
+                    rec_categories.append(-1)
         else:
             # Если нет рекомендаций, создаем пустые данные
             rec_embeddings = torch.zeros((0, user_emb.size(0)), device=self.device)
@@ -291,11 +313,23 @@ class Trainer:
         
         # Target category info
         target_id = items_ids[0].item() if len(items_ids) > 0 and items_ids[0].item() > 0 else None
+        # print(f"target_id = {target_id}")
         target_category = -1
+        # print('=============')
         if target_id is not None:
             orig_target_video_id = self.val_loader.dataset.reverse_item_id_map.get(target_id)
+            # print(f"orig_target_video_id = {orig_target_video_id}")
+#            print(f"self.val_loader.dataset.reverse_item_id_map = {self.val_loader.dataset.reverse_item_id_map}")
             if orig_target_video_id in df_videos_map:
-                category_name = df_videos_map[orig_target_video_id].get('category', 'Unknown')
+                # print(f"orig_target_video_id = {orig_target_video_id}")
+                # category_name = df_videos_map[orig_target_video_id].get('category', 'Unknown')
+                # target_category = category_mapping.get(category_name, -1)
+                categories = df_videos_map[orig_video_id].get('category', [])
+                # print(f"categories = {categories}")
+                if isinstance(categories, list) and len(categories) > 0:
+                    category_name = categories[0]  # берем первую
+                else:
+                    category_name = 'Unknown'
                 target_category = category_mapping.get(category_name, -1)
 
         # User demographic data
@@ -323,16 +357,13 @@ class Trainer:
         # Создаем множество релевантных ID (для классических метрик)
         # В данном случае считаем релевантными те видео, которые пользователь уже смотрел
         relevant_ids = set([str(id) for id in items_ids.cpu().numpy() if id > 0])
-        
-        # Calculate metrics
-        # Целевой товар
-        target_id = items_ids[0].item()
-        orig_target_video_id = self.val_loader.dataset.reverse_item_id_map.get(target_id)
-        target_category = df_videos_map.get(orig_target_video_id, {}).get('category', 'Unknown')
 
+        # print(f"rec_categories = {rec_categories}")
+        # print(f"target_category = {target_category}")
+        # print(f"relevant_ids = {relevant_ids}")
+        # print(f"recommended_ids = {recommended_ids}")
+        
         user_metrics = metrics_calculator.compute_metrics(
-            item_emb,
-            rec_embeddings,
             target_emb,
             rec_embeddings,
             target_category,
@@ -368,6 +399,7 @@ class Trainer:
                 
         # Используем новую функцию для вывода метрик
         print("\nValidation Metrics:")
+        print(metrics_dict)
         self._print_metrics(metrics_dict)
             
         return metrics_dict

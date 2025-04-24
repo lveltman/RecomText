@@ -86,7 +86,7 @@ def main(config=None):
     print(f"Loaded {len(df_videos)} items for indexing.")
     
     # 3) Загружаем модель и tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(text_model_name)
+    tokenizer = AutoTokenizer.from_pretrained("intfloat/multilingual-e5-base")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
     with open('./data/mappings/item_id_map.json', 'r', encoding='utf-8') as f:
@@ -116,6 +116,7 @@ def main(config=None):
     all_ids = []
 
     # 7) Прогоняем товары через модель
+    print(f"7) Прогоняем товары через модель")
     with torch.no_grad():
         for tokens_batch, item_ids_batch in tqdm(loader, desc="Indexing items"):
             tokens_batch = {k: v.to(device) for k, v in tokens_batch.items()}
@@ -127,7 +128,6 @@ def main(config=None):
                 "attention_mask": torch.zeros_like(tokens_batch["attention_mask"])
             }
             dummy_user_ids = torch.zeros_like(item_ids_batch.squeeze(1))
-
             # Прямой проход (только item_embeddings нам нужен)
             items_embeddings, _ = model(
                 tokens_batch,
@@ -135,7 +135,6 @@ def main(config=None):
                 item_ids_batch,
                 dummy_user_ids
             )
-
             # Нормируем для косинус-похожести
             items_embeddings = F.normalize(items_embeddings, p=2, dim=1)
 
@@ -147,8 +146,9 @@ def main(config=None):
 
             all_embeddings.append(items_embeddings_np)
             all_ids.extend(item_ids_np)
-
+    print(len(all_embeddings))
     # Объединяем
+    print("Объединяем", len(all_embeddings))
     all_embeddings = np.concatenate(all_embeddings, axis=0)
     print("Adding to Faiss index...", all_embeddings.shape)
     index.add(all_embeddings)

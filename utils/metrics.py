@@ -8,7 +8,7 @@ from sklearn.metrics import precision_recall_curve
 class MetricsCalculator:
     """Калькулятор специализированных метрик для рекомендательной системы."""
     
-    def __init__(self, sim_threshold_precision: float = None, sim_threshold_ndcg: float = None):
+    def __init__(self, sim_threshold_precision: float = None, sim_threshold_ndcg: float = None, calibration_samples: int = None):
         """
         Args:
             sim_threshold_precision: порог для "успешной" семантической близости в precision
@@ -17,7 +17,7 @@ class MetricsCalculator:
         # Устанавливаем значения по умолчанию, если переданы None
         self.sim_threshold_precision = sim_threshold_precision if sim_threshold_precision is not None else 0.8
         self.sim_threshold_ndcg = sim_threshold_ndcg if sim_threshold_ndcg is not None else 0.83
-        self.calibrated = False
+        self.calibrated = True if calibration_samples is not None else False
         
         # Для калибровки порогов
         self.all_similarities = []
